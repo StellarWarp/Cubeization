@@ -11,7 +11,8 @@
 			"AdditionalDependencies": [
 				"MassSpawner",
 				"MassEntity",
-				"Engine"
+				"Engine",
+				"MassRepresentation"
 			]
 		}
 	],
@@ -42,10 +43,6 @@
 		{
 			"Name": "CubeCompute",
 			"Enabled": false
-		},
-		{
-			"Name": "Volumetrics",
-			"Enabled": true
 		}
 	]
 }
