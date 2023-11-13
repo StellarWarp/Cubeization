@@ -8,16 +8,25 @@ public class Cubeization : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+		PublicIncludePaths.AddRange(
+			new string[]
+			{
+				"Cubeization"
+			});
+
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
 			"Core",
 			"CoreUObject",
-			"Engine", 
-			"InputCore", 
+			"Engine",
+			"InputCore",
 			"HeadMountedDisplay",
-			"EnhancedInput"
+			"EnhancedInput",
+			"GameplayAbilities",
+			"GameplayTags",
+			"GameplayTasks",
 		});
-		
+
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			// AI/MassAI Plugin Modules
@@ -39,6 +48,9 @@ public class Cubeization : ModuleRules
 			"MassSpawner",
 			"MassSimulation",
 			"MassSignals",
+
+			//
+			"PhysicsCore"
 		});
 	}
 }
