@@ -5,7 +5,7 @@
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "DynamicTerrain/FieldGlobalData.h"
+#include "..\DynamicTerrain\TerrainDataSubsystem.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -142,7 +142,7 @@ void AFieldAtomCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 void AFieldAtomCharacter::FieldInteractionTick(float DeltaTime)
 {
-	auto FieldDataSubsystem = GetWorld()->GetSubsystem<UFieldDataSubsystem>();
+	auto FieldDataSubsystem = GetWorld()->GetSubsystem<UTerrainDataSubsystem>();
 
 	const FVector Location = GetActorLocation();
 	const float FieldHeight = FieldDataSubsystem->GetHeight(Location);
@@ -180,7 +180,7 @@ void AFieldAtomCharacter::FieldInteractionTick(float DeltaTime)
 		// //movement
 		// Force += DeltaSpeed * MovementForceMultiplier;
 
-		AddMovementInput(Force,MovementForceMultiplier);
+		// AddMovementInput(Force);
 
 		
 	
@@ -204,11 +204,11 @@ void AFieldAtomCharacter::DirectionalMovementTick(float DeltaTime)
 	FRotator CurrentRotation = GetActorRotation();
 	FRotator NewRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, 10);
 
-	DrawDebugLine(GetWorld(), GetActorLocation(), TargetPosition, FColor::Red, false, 0.1f, 0, 5.f);
-	DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + GetActorForwardVector() * 100, FColor::Green, false, 0.1f, 0, 5.f);
-	//line of target rotation
-	DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + NewRotation.Vector() * 100, FColor::Blue, false, 0.1f, 0, 5.f);
-
+	// DrawDebugLine(GetWorld(), GetActorLocation(), TargetPosition, FColor::Red, false, 0.1f, 0, 5.f);
+	// DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + GetActorForwardVector() * 100, FColor::Green, false, 0.1f, 0, 5.f);
+	// //line of target rotation
+	// DrawDebugLine(GetWorld(), GetActorLocation(), GetActorLocation() + NewRotation.Vector() * 100, FColor::Blue, false, 0.1f, 0, 5.f);
+	//
 	SetActorRotation(NewRotation);
 }
 

@@ -3,12 +3,12 @@
 
 #include "GroundCubeProcessor.h"
 
-#include "FieldGlobalData.h"
+#include "TerrainDataSubsystem.h"
 #include "GroundCubeTrait.h"
 #include "MassCommonTypes.h"
 #include "MassCommonFragments.h"
 #include "MassExecutionContext.h"
-#include "Kismet/GameplayStatics.h"
+#include "TerrainRepresentationSubsystem.h"
 
 UGroundCubeProcessor::UGroundCubeProcessor()
 {
@@ -26,8 +26,7 @@ void UGroundCubeProcessor::ConfigureQueries()
 
 void UGroundCubeProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-	const auto elapsedTime = UGameplayStatics::GetTimeSeconds(Context.GetWorld());
-	UFieldDataSubsystem* FieldData = Context.GetWorld()->GetSubsystem<UFieldDataSubsystem>();
+	UTerrainDataSubsystem* FieldData = Context.GetWorld()->GetSubsystem<UTerrainDataSubsystem>();
 	auto& HeightField = FieldData->HeightField;
 	auto& VelocityField = FieldData->VelocityField;
 	const auto& FieldParameter = FieldData->FieldParameter;
@@ -55,8 +54,8 @@ void UGroundCubeProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 				{
 					for (int32 j = -1; j <= 1; ++j)
 					{
-						float ChangingHeight = HeightField[FIntVector2(x + i, y + j)] - LastHeightField[FIntVector2(
-							x + i, y + j)];
+						float ChangingHeight =
+							HeightField[FIntVector2(x + i, y + j)] - LastHeightField[FIntVector2(x + i, y + j)];
 						Force += FieldParameter.Transfer * ChangingHeight * TransferKernel[i + 1][j + 1];
 					}
 				}
@@ -76,7 +75,7 @@ void UGroundCubeProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 			const auto Info = Queue.Peek();
 			FieldData->ForRangeVelocity(Info->Center, Info->Radius, [=](const FVector& Distance, float& Val)
 			{
-				Val += UFieldDataSubsystem::GaussianLUT.LUT128[Distance / Info->Radius]
+				Val += UTerrainDataSubsystem::GaussianLUT.LUT128[Distance / Info->Radius]
 					* Info->Force * DeltaTime;
 			});
 			Queue.Pop();
@@ -90,7 +89,6 @@ void UGroundCubeProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 		auto& RawHeightField = HeightField.GetData();
 		auto& RawVelocityField = VelocityField.GetData();
 
-		//test
 
 		for (int i = 0; i < RawHeightField.Num(); ++i)
 		{
@@ -99,9 +97,9 @@ void UGroundCubeProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 			RawVelocityField[i] += (ElasticForce + DampingForce) * DeltaTime;
 			RawHeightField[i] += RawVelocityField[i] * DeltaTime;
 		}
+
 	}
-
-
+	
 	//entity sync
 	Query.ForEachEntityChunk(EntityManager, Context, [=](FMassExecutionContext& Context) mutable
 	{
@@ -111,7 +109,17 @@ void UGroundCubeProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 		{
 			FTransformFragment& TransformFragment = TransformFragments[i];
 			auto& Transform = TransformFragment.GetMutableTransform();
-			FIntVector2 LocalIndex = CubeFragments[i].Index;
+
+			auto ModToPositive = [] (int32& Value, const int32 Mod)
+			{
+				Value = (Value % Mod + Mod) % Mod;
+			};
+
+			
+			FIntVector2 LocalIndex = CubeFragments[i].Index - FieldData->Offset;
+			ModToPositive(LocalIndex.X, FieldData->DynamicFieldSize.X);
+			ModToPositive(LocalIndex.Y, FieldData->DynamicFieldSize.Y);
+			
 			FIntVector2 LogicalIndex = FieldData->LocalIndexToLogicalIndex(LocalIndex);
 			FVector Location = FieldData->LogicalIndexToWorldPosition(LogicalIndex);
 			Location.Z = HeightField[LogicalIndex];
@@ -119,10 +127,14 @@ void UGroundCubeProcessor::Execute(FMassEntityManager& EntityManager, FMassExecu
 
 
 			// DrawDebugLine(Context.GetWorld(),
-			// 	Location,
+			// 	FVector(Location.X, Location.Y, 0),
 			// 	Location + FVector(0, 0, 100),
 			// 	FColor::Red,
 			// 	false, 0.1f, 0, 1);
 		}
 	});
+
+	//actor sync
+	UTerrainRepresentationSubsystem* TerrainRepresentationSubsystem = Context.GetWorld()->GetSubsystem<UTerrainRepresentationSubsystem>();
+	TerrainRepresentationSubsystem->UpdateReplacingActor();
 }

@@ -48,9 +48,11 @@ public class Cubeization : ModuleRules
 			"MassSpawner",
 			"MassSimulation",
 			"MassSignals",
+			
+			"ChaosSolverEngine",
+			"GeometryCollectionEngine",
 
-			//
-			"PhysicsCore"
+			"PhysicsCore",
 		});
 	}
 }

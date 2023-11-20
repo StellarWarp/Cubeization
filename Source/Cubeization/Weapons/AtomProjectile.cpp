@@ -3,6 +3,7 @@
 
 #include "AtomProjectile.h"
 
+#include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
 
@@ -14,6 +15,12 @@ AAtomProjectile::AAtomProjectile()
 	
 	bReplicates = true;
 
+	SphereComponent = CreateDefaultSubobject<USphereComponent>(FName("SphereComponent"));
+	RootComponent = SphereComponent;
+	SphereComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	SphereComponent->SetCollisionProfileName("Projectile");
+	SphereComponent->InitSphereRadius(SphereRadius);
+
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(FName("ProjectileMovement"));
 }
 
@@ -21,7 +28,6 @@ AAtomProjectile::AAtomProjectile()
 void AAtomProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	
 }
 
 void AAtomProjectile::SetVelocity(const FVector_NetQuantizeNormal& ImpactNormal)

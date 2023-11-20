@@ -4,11 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "MassVisualizer.h"
+#include "Weapons/WeaponRespond.h"
 #include "ExMassVisualizer.generated.h"
 
 
 UCLASS()
-class CUBEIZATION_API AExMassVisualizer : public AMassVisualizer
+class CUBEIZATION_API AExMassVisualizer : public AMassVisualizer, public IWeaponRespond
 {
 	GENERATED_BODY()
 public:
@@ -21,6 +22,11 @@ public:
 // 	UPROPERTY()
 // 	TObjectPtr<class UMassVisualizationComponent> ExVisComponent;
 
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void NotifyWeaponHit(FWeaponHitInfo HitInfo);
+	virtual void NotifyWeaponHit_Implementation(FWeaponHitInfo HitInfo) override;
+
 protected:
 
+	
 };

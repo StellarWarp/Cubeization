@@ -8,6 +8,7 @@
 #include "PhysicsInterfaceDeclaresCore.h"
 #include "PhysicsProxy/SingleParticlePhysicsProxyFwd.h"
 #include "Chaos/ChaosEngineInterface.h"
+#include "DynamicTerrain/TerrainRepresentationSubsystem.h"
 #include "Physics/Experimental/PhysScene_Chaos.h"
 #include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 
@@ -138,11 +139,20 @@ void UExMassVisualizationComponent::TickComponent(float DeltaTime, ELevelTick Ti
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	if(BatchUpdateCounter > TotalBatchUpdateCount)
+	{
+		BatchUpdateCounter = 0;
+	}
+	BatchUpdateBeginIndex = BatchUpdateCounter * InstanceBodiesSyncBatchSize;
+	BatchUpdateEndIndex = FMath::Min(BatchUpdateBeginIndex + InstanceBodiesSyncBatchSize, TotalInstanceCount);
+
 	for (FMassInstancedStaticMeshInfo& InfoSuper : InstancedStaticMeshInfos)
 	{
 		auto& Info = *static_cast<FExMassInstancedStaticMeshInfo*>(&InfoSuper);
 		for (auto ISMC : Info.InstancedStaticMeshComponents)
 		{
+
+			
 			if (ISMC->GetNumRenderInstances() != ISMC->InstanceBodies.Num())
 			{
 				UE_LOG(LogTemp, Display, TEXT("\n\
@@ -172,44 +182,52 @@ void UExMassVisualizationComponent::TickComponent(float DeltaTime, ELevelTick Ti
 				       ISMC->GetNumRenderInstances(),
 				       ISMC->InstanceBodies.Num()
 				);
+				BatchUpdateCounter = 0;
+				TotalBatchUpdateCount = FMath::CeilToInt(ISMC->InstanceBodies.Num() / (float)InstanceBodiesSyncBatchSize);
+				TotalInstanceCount = ISMC->InstanceBodies.Num();
 			}
-			auto InstanceTransforms = ISMC->PerInstancePrevTransform;
+			UTerrainRepresentationSubsystem* TerrainRepresentationSubsystem = GetWorld()->GetSubsystem<UTerrainRepresentationSubsystem>();
+			TerrainRepresentationSubsystem->DeferredInstanceUpdate(ISMC);
+
+			
+			auto& InstanceTransforms = ISMC->PerInstanceSMData;
 			auto& InstanceBodies = ISMC->InstanceBodies;
+
+			int32 BeginIndex = BatchUpdateBeginIndex;
+			int32 EndIndex = BatchUpdateEndIndex;
+			
 			//sync InstanceBodies with InstanceTransforms
-			for (int32 InstanceIndex = 0; InstanceIndex < ISMC->InstanceBodies.Num(); ++InstanceIndex)
+			for (int32 InstanceIndex = BeginIndex; InstanceIndex < EndIndex; ++InstanceIndex)
 			{
-				auto&& Transform = FTransform(InstanceTransforms[InstanceIndex]);
-				// InstanceBodies[InstanceIndex]->SetBodyTransform(Transform, ETeleportType::TeleportPhysics);
-				auto& ActorHandle = InstanceBodies[InstanceIndex]->GetPhysicsActorHandle();
-				FPhysicsCommand::ExecuteWrite(ActorHandle, [&](const FPhysicsActorHandle& Actor)
-				{
-					// const bool bKinematic = FPhysicsInterface::IsKinematic_AssumesLocked(Actor);
-					// const bool bSimulated = FPhysicsInterface::CanSimulate_AssumesLocked(Actor);
-					// const bool bIsSimKinematic = bKinematic && bSimulated;
-					// if (bIsSimKinematic)
-					// {
-					// // }
-					// FPhysicsInterface::SetKinematicTarget_AssumesLocked(Actor, Transform);
-					FPhysicsInterface::SetGlobalPose_AssumesLocked(Actor, Transform);
-				});
+				auto&& Transform = FTransform(InstanceTransforms[InstanceIndex].Transform);
+				InstanceBodies[InstanceIndex]->SetBodyTransform(Transform, ETeleportType::TeleportPhysics);
+				// DrawDebugLine(GetWorld(), Transform.GetLocation(),
+				// 	Transform.GetLocation() + FVector(0, 0, 100), FColor::Cyan,
+				// 	false, 0.1, 0, 5.f);
+				// auto& ActorHandle = InstanceBodies[InstanceIndex]->GetPhysicsActorHandle();
+				// FPhysicsCommand::ExecuteWrite(ActorHandle, [&](const FPhysicsActorHandle& Actor)
+				// {
+				// 	// const bool bKinematic = FPhysicsInterface::IsKinematic_AssumesLocked(Actor);
+				// 	// const bool bSimulated = FPhysicsInterface::CanSimulate_AssumesLocked(Actor);
+				// 	// const bool bIsSimKinematic = bKinematic && bSimulated;
+				// 	// if (bIsSimKinematic)
+				// 	// {
+				// 	// // }
+				// 	// FPhysicsInterface::SetKinematicTarget_AssumesLocked(Actor, Transform);
+				// 	FPhysicsInterface::SetGlobalPose_AssumesLocked(Actor, Transform);
+				// });
 			}
+
+
 		}
 	}
-}
 
-void UExMassVisualizationComponent::EnableInstancesCollision(bool bCond)
-{
-	// for (auto Element : COLLECTION)
-	// {
-	// 	
-	// }
+	BatchUpdateCounter++;
 }
 
 void UExMassVisualizationComponent::ExBeginVisualChanges()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("MassVisualizationComponent BeginVisualChanges")
-
-	EnableInstancesCollision(true);
 
 	// Conditionally construct static mesh components
 	if (bNeedStaticMeshComponentConstruction)
@@ -229,4 +247,10 @@ void UExMassVisualizationComponent::ExBeginVisualChanges()
 		SharedData.StaticMeshInstancePrevTransforms.Reset();
 		SharedData.WriteIterator = 0;
 	}
+}
+
+void UExMassVisualizationComponent::NotifyWeaponHit_Implementation(FWeaponHitInfo HitInfo)
+{
+	auto TerrainRepresentationSubsystem = GetWorld()->GetSubsystem<UTerrainRepresentationSubsystem>();
+	TerrainRepresentationSubsystem->NotifyDestruction(HitInfo);
 }

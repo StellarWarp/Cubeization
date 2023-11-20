@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayEffectTypes.h"
+#include "Components/SphereComponent.h"
 #include "GameFramework/Actor.h"
 #include "AtomProjectile.generated.h"
 
@@ -16,12 +17,18 @@ public:
 	// Sets default values for this actor's properties
 	AAtomProjectile();
 
-	UPROPERTY(BlueprintReadWrite, Meta = (ExposeOnSpawn = true))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGameplayEffectSpecHandle DamageEffectSpecHandle;
 
-	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	class UProjectileMovementComponent* ProjectileMovement;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	USphereComponent* SphereComponent;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float SphereRadius = 5.0f;
+	
 	void SetVelocity(const FVector_NetQuantizeNormal& ImpactNormal);
 protected:
 	// Called when the game starts or when spawned

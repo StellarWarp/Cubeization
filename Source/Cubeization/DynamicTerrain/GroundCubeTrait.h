@@ -31,6 +31,14 @@ class CUBEIZATION_API UGroundCubeTrait : public UMassEntityTraitBase
 {
 	GENERATED_BODY()
 
+public:
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<class ATerrainCubeActor> ReplacingActorClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<AActor> DestructionFieldClass;
+	
 protected:
 	void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };

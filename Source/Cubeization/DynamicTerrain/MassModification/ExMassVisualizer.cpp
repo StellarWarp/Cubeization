@@ -9,3 +9,8 @@ AExMassVisualizer::AExMassVisualizer(): AMassVisualizer()
 	VisComponent->DestroyComponent();
 	VisComponent = CreateDefaultSubobject<UExMassVisualizationComponent>(TEXT("ExVisualizerComponent"));
 }
+
+void AExMassVisualizer::NotifyWeaponHit_Implementation(FWeaponHitInfo HitInfo)
+{
+	Cast<UExMassVisualizationComponent>(VisComponent)->NotifyWeaponHit(HitInfo);
+}

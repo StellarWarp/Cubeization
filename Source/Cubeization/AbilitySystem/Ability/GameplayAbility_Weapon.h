@@ -16,7 +16,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameplayAbility")
 	TSubclassOf<class UGameplayEffect> DamageEffect;
 
-	//fx to play on hit 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameplayAbility")
+	TSubclassOf<AActor> DestructionFieldClass;
 	
 	
 

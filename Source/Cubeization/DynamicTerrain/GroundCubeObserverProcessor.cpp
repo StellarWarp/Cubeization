@@ -5,7 +5,7 @@
 
 #include "GroundCubeTrait.h"
 #include "MassExecutionContext.h"
-#include "FieldGlobalData.h"
+#include "TerrainDataSubsystem.h"
 #include "MassCommonFragments.h"
 
 
@@ -24,17 +24,22 @@ void UGroundCubeObserverProcessor::ConfigureQueries()
 
 void UGroundCubeObserverProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-	UFieldDataSubsystem* FieldData = Context.GetWorld()->GetSubsystem<UFieldDataSubsystem>();
+	UTerrainDataSubsystem* FieldData = Context.GetWorld()->GetSubsystem<UTerrainDataSubsystem>();
 
 	Query.ForEachEntityChunk(EntityManager, Context, [=](FMassExecutionContext& Context)
 	{
 		const TConstArrayView<FTransformFragment> TransformFragments = Context.GetFragmentView<FTransformFragment>();
 		const TArrayView<FGroundCubeFragment> CubeFragments = Context.GetMutableFragmentView<FGroundCubeFragment>();
-
 		for (int32 i = 0; i < Context.GetNumEntities(); ++i)
 		{
+
 			auto& Index = CubeFragments[i].Index;
 			Index = FieldData->CubeIndexAllocator.Allocate();
+
+			uint32 InstanceId = GetTypeHash(Context.GetEntity(i));
+			
+			FieldData->InstanceIndexId[Index] = InstanceId;
+			
 		}
 	});
 
