@@ -19,9 +19,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameplayAbility")
 	TSubclassOf<AActor> DestructionFieldClass;
 	
-	
+	//niagara effect to play on hit
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameplayAbility")
+	TObjectPtr<class UNiagaraSystem> HitNiagaraEffect;
 
-	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameplayAbility")
+	TObjectPtr<class UNiagaraSystem> TrailNiagaraEffect;
+
+	//hack
+	float LastFireTime = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameplayAbility")
+	float FireInterval = 0.5f;
+
+
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 protected:

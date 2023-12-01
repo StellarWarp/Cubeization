@@ -1,5 +1,7 @@
 ﻿#include "CubeizationPlayerController.h"
 
+class UEnhancedInputLocalPlayerSubsystem;
+
 void ACubeizationPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -27,5 +29,18 @@ void ACubeizationPlayerController::CameraViewInit()
 {
 	//look down 45 degree
 	SetControlRotation(FRotator(-45, 45, 0));
+}
+
+void ACubeizationPlayerController::SetSuspended(bool bSuspend)
+{
+	if (bSuspend)
+	{
+		OnSuspend.Broadcast();
+	}
+	else
+	{
+		OnResume.Broadcast();
+	}
+	bSuspended = bSuspend;
 }
 

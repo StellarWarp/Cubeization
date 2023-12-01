@@ -120,10 +120,10 @@ void ATerrainCubeActor::DeferredInit()
 		Location + FVector(0, 0, 1000),
 		Location,
 		ECC_Visibility);
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan,
-	                                 FString::Printf(
-		                                 TEXT("HitResult = %s"),
-		                                 HitResult.GetActor() ? *HitResult.GetActor()->GetName() : TEXT("None")));
+	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan,
+	//                                  FString::Printf(
+	// 	                                 TEXT("HitResult = %s"),
+	// 	                                 HitResult.GetActor() ? *HitResult.GetActor()->GetName() : TEXT("None")));
 	//draw hit point
 	// DrawDebugPoint(GetWorld(), HitResult.ImpactPoint,50 ,FColor::Red,false, 10.f, 0.5f);
 

@@ -39,7 +39,14 @@ public:
 	{
 		SizeX = x;
 		SizeY = y;
-		Data.Init(0, x * y);
+		Data.Init(T{}, x * y);
+	}
+
+	void Init(const T& val, const uint32 x, const uint32 y)
+	{
+		SizeX = x;
+		SizeY = y;
+		Data.Init(val, x * y);
 	}
 
 	TFieldArray(const TArray<T>& In, const uint32 InSizeX, const uint32 InSizeY)
@@ -113,6 +120,14 @@ public:
 				// 	FVector(i, j, 0) * 100 + FVector(0, 0, (*this)[{i, j}]) * 100,
 				// 	FColor::Red);
 			}
+		}
+	}
+
+	void UniformSet(const T& Val)
+	{
+		for(auto& Elem : Data)
+		{
+			Elem = Val;
 		}
 	}
 

@@ -5,19 +5,50 @@
 #include "Utils/MathematicsExtension.h"
 #include "TerrainDataSubsystem.generated.h"
 
-
-UCLASS()
-class UTerrainDataSubsystem : public UWorldSubsystem
+USTRUCT(BlueprintType)
+struct FFieldParameter
 {
 	GENERATED_BODY()
 
-public:
+	FFieldParameter() = default;
+	
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Elasticity = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Damping = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Transfer = 0;
+
+	//return is finished
+	bool Lerp(const FFieldParameter& Other, const float Alpha)
+	{
+		Elasticity = FMath::Lerp(Elasticity, Other.Elasticity, Alpha);
+		Damping = FMath::Lerp(Damping, Other.Damping, Alpha);
+		Transfer = FMath::Lerp(Transfer, Other.Transfer, Alpha);
+
+		return FMath::IsNearlyEqual(Elasticity, Other.Elasticity);
+	}
+};
+
+UCLASS()
+class UTerrainDataSubsystem : public UTickableWorldSubsystem
+{
+	GENERATED_BODY()
+
+
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override { return true; }
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override { return GetStatID(); }
+
 	void GenerateMap();
 
+private:
+	bool bPreGridParameter = false;
 
+public:
 	float CubeLength = 100;
 	FVector WorldOffset;
 	FIntVector2 Offset;
@@ -30,10 +61,13 @@ public:
 
 	TFieldArray<float> BaseHeightField;
 	TFieldArray<float> LastHeightField;
+	TFieldArray<float> ActivationShiftField;
 	TFieldArray<float> HeightField;
 	TFieldArray<float> VelocityField;
 	TFieldArray<float> AccelerationField;
 	TFieldArray<uint32> InstanceIndexId;
+
+	TMap<FIntVector2, TFunction<void(const FIntVector2&)>> EventTriggerMap;
 
 	struct FDeferredApplyForce
 	{
@@ -44,9 +78,9 @@ public:
 
 	TQueue<FDeferredApplyForce> DeferredApplyForceQueue;
 
-private:
-
-	
+public:
+	bool bExternalAnimationControl = false;
+	void MapDataToField();
 
 public:
 	float GetBaseHeight(const FIntVector2& Pos) { return BaseHeightField[Pos]; }
@@ -62,13 +96,22 @@ public:
 		return AccelerationField.GetInterpreted(WorldPositionToLogicalPosition(Pos));
 	}
 
+	void AddPointForce(const FVector& Pos, const float Acceleration)
+	{
+		const float DeltaTime = GetWorld()->GetDeltaSeconds();
+		VelocityField[WorldPositionToLogicalIndex(Pos)] += Acceleration * DeltaTime;
+	}
+
+	void ForRangeBaseHeight(const FVector& Center, const uint32 HalfExtent,
+	                        const TFunctionRef<void(const FVector&, float&)>& Func)
+	{
+		BaseHeightField.ForRange(WorldPositionToLogicalPosition(Center), HalfExtent, Func);
+	}
+
 	void ForRangeHeight(const FVector& Center, const uint32 HalfExtent,
 	                    const TFunctionRef<void(const FVector&, float&)>& Func)
 	{
 		HeightField.ForRange(WorldPositionToLogicalPosition(Center), HalfExtent, Func);
-		DrawDebugBox(GEngine->GetWorldContextFromGameViewport(GEngine->GameViewport)->World(),
-		             FVector(Center.X, Center.Y, 0),
-		             FVector(HalfExtent * 100, HalfExtent * 100, 100), FColor::Red);
 	}
 
 	void ForRangeVelocity(const FVector& Center, const uint32 HalfExtent,
@@ -81,6 +124,12 @@ public:
 	                          const TFunctionRef<void(const FVector&, float&)>& Func)
 	{
 		AccelerationField.ForRange(WorldPositionToLogicalPosition(Center), HalfExtent, Func);
+	}
+
+	void ForRangeActivationShift(const FVector& Center, const uint32 HalfExtent,
+	                             const TFunctionRef<void(const FVector&, float&)>& Func)
+	{
+		ActivationShiftField.ForRange(WorldPositionToLogicalPosition(Center), HalfExtent, Func);
 	}
 
 	/*
@@ -144,6 +193,45 @@ public:
 	void ShiftField(FIntVector2 OffsetIncrement);
 
 	void UpdateCenter(FVector Center);
+
+	void ActivationShiftSetUniform(float Value)
+	{
+		auto& Raw = ActivationShiftField.GetData();
+		for (int i = 0; i < Raw.Num(); ++i)
+		{
+			Raw[i] = Value;
+		}
+	}
+
+	void CenterActiveField(const FVector& Center,
+	                       const float HalfExtent, const float FallOff,
+	                       const float Max, const float Min)
+	{
+		ForRangeActivationShift(Center, HalfExtent + FallOff + 1, [=](const FVector& Distance, float& Val)
+		{
+			float X_Dist = FMath::Abs(Distance.X);
+			float Y_Dist = FMath::Abs(Distance.Y);
+
+			float Dist = FMath::Max(X_Dist, Y_Dist);
+			if (Dist < FallOff)
+			{
+				Val = Max;
+			}
+			else
+			{
+				Val = (Dist - HalfExtent) * (Min - Max) / (FallOff) + Max;
+			}
+		});
+	}
+
+	void TriggerQuery(const FVector& WorldPosition)
+	{
+		auto LogicalIndex = WorldPositionToLogicalIndex(WorldPosition);
+		if (EventTriggerMap.Contains(LogicalIndex))
+		{
+			EventTriggerMap[LogicalIndex](LogicalIndex);
+		}
+	}
 
 public:
 	struct FGaussianLUT
@@ -229,34 +317,16 @@ public:
 
 	FCubeIndexAllocator CubeIndexAllocator;
 
+private:
+	bool bFieldParameterLerp = false;
+	float FieldParameterLerpSpeed = 1;
+	FFieldParameter FieldParameter;
+	FFieldParameter NewFieldParameter;
+	TFieldArray<FFieldParameter> PreGridParameterField;
 public:
-	struct FFieldParameter
-	{
-		float Elasticity = 0;
-		float Damping = 0;
-		float Transfer = 0;
-		float Debug1 = 0;
-		float Debug2 = 0;
-		FVector Debug3 = {0, 0, 0};
-	} FieldParameter;
 
 	UFUNCTION(BlueprintCallable)
-	void SetFieldParameter(
-		const float Elasticity,
-		const float Damping,
-		const float Transfer,
-		const float Debug1,
-		const float Debug2,
-		const FVector Debug3
-	)
-	{
-		FieldParameter = {
-			Elasticity,
-			Damping,
-			Transfer,
-			Debug1,
-			Debug2,
-			Debug3
-		};
-	}
+	void SetFieldParameter(const FFieldParameter& Parameter, float Speed = 1);
+
+	void FieldParameterLerpTick(float DeltaTime);
 };

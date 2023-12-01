@@ -38,7 +38,5 @@ protected:
 	int BatchUpdateCounter = 0;
 	int TotalBatchUpdateCount = 0;
 	int TotalInstanceCount = 0;
-	int BatchUpdateBeginIndex = 0;
-	int BatchUpdateEndIndex = 0;
 	
 };

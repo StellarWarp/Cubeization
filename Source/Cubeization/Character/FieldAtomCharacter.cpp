@@ -11,7 +11,7 @@
 #include "Windows/AllowWindowsPlatformTypes.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Ability/CubeGameplayAbility.h"
-#include "Components/CapsuleComponent.h"
+#include "AbilitySystem/Ability/GameplayAbility_Weapon.h"
 #include "Controller/CubeizationPlayerController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -24,7 +24,7 @@ AFieldAtomCharacter::AFieldAtomCharacter()
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>("MeshComponent");
 	MeshComponent->SetupAttachment(RootComponent);
-	
+
 	// GetCapsuleComponent()->Deactivate();
 
 	// Don't rotate when the controller rotates. Let that just affect the camera.
@@ -88,6 +88,16 @@ void AFieldAtomCharacter::BeginPlay()
 	{
 		GetAbilitySystemComponent()->GiveAbility(FGameplayAbilitySpec(StartupAbility));
 	}
+
+	//register event
+	auto PC = Cast<ACubeizationPlayerController>(GetController());
+
+	TScriptDelegate FOnPauseDelegate;
+	FOnPauseDelegate.BindUFunction(this, "OnSuspend");
+	PC->OnSuspend.Add(FOnPauseDelegate);
+	TScriptDelegate FOnResumeDelegate;
+	FOnResumeDelegate.BindUFunction(this, "OnResume");
+	PC->OnResume.Add(FOnResumeDelegate);
 }
 
 UAbilitySystemComponent* AFieldAtomCharacter::GetAbilitySystemComponent() const
@@ -110,8 +120,11 @@ void AFieldAtomCharacter::PossessedBy(AController* NewController)
 // Called every frame
 void AFieldAtomCharacter::Tick(float DeltaTime)
 {
-	FieldInteractionTick(DeltaTime);
 	DirectionalMovementTick(DeltaTime);
+	if (!IsSuspended())
+		FieldInteractionTick(DeltaTime);
+	else
+		SuspendTick(DeltaTime);
 }
 
 // Called to bind functionality to input
@@ -124,20 +137,36 @@ void AFieldAtomCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	{
 		//Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &AFieldAtomCharacter::Jump);
-
 		//Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AFieldAtomCharacter::Move);
 
 		// //Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFieldAtomCharacter::Look);
+		
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &AFieldAtomCharacter::Fire);
 	}
 
 	AbilitySystem->BindToInputComponent(PlayerInputComponent);
-	// AbilitySystem->BindAbilityActivationToInputComponent(PlayerInputComponent,
-	// 	FGameplayAbilityInputBinds(
-	// 		"ConfirmInput",
-	// 		"CancelInput",
-	// 		 "EAbilityInputID"));
+}
+
+bool AFieldAtomCharacter::IsSuspended()
+{
+	auto PC = Cast<ACubeizationPlayerController>(GetController());
+	return PC->IsSuspended();
+}
+
+void AFieldAtomCharacter::OnSuspend_Implementation()
+{
+	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Pause"));
+
+	auto Location = GetActorLocation();
+	BeforeSuspendHeight = Location.Z;
+}
+
+
+void AFieldAtomCharacter::OnResume_Implementation()
+{
+	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Resume"));
 }
 
 void AFieldAtomCharacter::FieldInteractionTick(float DeltaTime)
@@ -173,7 +202,7 @@ void AFieldAtomCharacter::FieldInteractionTick(float DeltaTime)
 		float Acceleration = (NextHeight - Height) / DeltaTime + RepulsiveForce * 0.5f;
 		//movement force
 		FVector Force(0, 0, Acceleration);
-	
+
 		// FVector TargetSpeed = ControlInputVector * MovementMaxSpeed;
 		// ControlInputVector = FVector::ZeroVector;
 		// FVector DeltaSpeed = TargetSpeed - PrimitiveComponent->GetPhysicsLinearVelocity();
@@ -182,8 +211,7 @@ void AFieldAtomCharacter::FieldInteractionTick(float DeltaTime)
 
 		// AddMovementInput(Force);
 
-		
-	
+
 		// PrimitiveComponent->AddForce(Force, NAME_None, true);
 	}
 
@@ -193,13 +221,13 @@ void AFieldAtomCharacter::FieldInteractionTick(float DeltaTime)
 void AFieldAtomCharacter::DirectionalMovementTick(float DeltaTime)
 {
 	auto PC = Cast<ACubeizationPlayerController>(GetController());
-	if(PC == nullptr)
+	if (PC == nullptr)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Controller is not a CubeizationPlayerController"));
 		return;
 	}
 	auto TargetPosition = PC->GetPointingPosition();
-	
+
 	FRotator TargetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), TargetPosition);
 	FRotator CurrentRotation = GetActorRotation();
 	FRotator NewRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, 10);
@@ -212,10 +240,20 @@ void AFieldAtomCharacter::DirectionalMovementTick(float DeltaTime)
 	SetActorRotation(NewRotation);
 }
 
+void AFieldAtomCharacter::SuspendTick(float DeltaTime)
+{
+	//lerp the location to suspend height
+	auto Location = GetActorLocation();
+	float NextHeight = FMath::Lerp(Location.Z, SuspendHoverHeight, SuspendLerpSpeed);
+	Location.Z = NextHeight;
+	SetActorLocation(Location);
+}
+
 void AFieldAtomCharacter::Move(const FInputActionValue& Value)
 {
+	if(IsSuspended()) return;
 	// input is a Vector2D
-	FVector2D MovementVector = Value.Get<FVector2D>();
+	const FVector MovementVector = Value.Get<FVector>();
 
 	if (Controller != nullptr)
 	{
@@ -229,9 +267,13 @@ void AFieldAtomCharacter::Move(const FInputActionValue& Value)
 		// get right vector 
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
+		// get up vector
+		const FVector UpDirection = {0, 0, 1};
+
 		// add movement 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
+		AddMovementInput(UpDirection, MovementVector.Z);
 	}
 }
 
@@ -252,4 +294,13 @@ void AFieldAtomCharacter::Look(const FInputActionValue& Value)
 	// 	AddControllerYawInput(LookAxisVector.X);
 	// 	AddControllerPitchInput(LookAxisVector.Y);
 	// }
+}
+
+void AFieldAtomCharacter::Fire(const FInputActionValue& Value)
+{
+	if(IsSuspended()) return;
+
+	AbilitySystem->TryActivateAbilitiesByTag(
+		FGameplayTagContainer(FGameplayTag::RequestGameplayTag(FName("Ability.Weapon")))
+		);
 }

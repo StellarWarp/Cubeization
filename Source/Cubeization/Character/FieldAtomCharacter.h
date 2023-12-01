@@ -16,10 +16,10 @@ class CUBEIZATION_API AFieldAtomCharacter : public ACharacter ,public IAbilitySy
 {
 	GENERATED_BODY()
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UStaticMeshComponent* MeshComponent;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UPrimitiveComponent* PrimitiveComponent;
 
 	/** Camera boom positioning the camera behind the character */
@@ -45,6 +45,9 @@ class CUBEIZATION_API AFieldAtomCharacter : public ACharacter ,public IAbilitySy
 	/** Look Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* LookAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* FireAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	float TargetHeight = 200;
@@ -72,6 +75,13 @@ class CUBEIZATION_API AFieldAtomCharacter : public ACharacter ,public IAbilitySy
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	float AtomRadius = 100;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	float SuspendHoverHeight = 400;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	float SuspendLerpSpeed = 0.01;
+	float BeforeSuspendHeight = 0;
+	
 
 	//todo this is a temp solution
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
@@ -102,14 +112,27 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	bool IsSuspended();
+	
+	UFUNCTION(BlueprintNativeEvent,BlueprintCallable)
+	void OnSuspend();
+
+	UFUNCTION(BlueprintNativeEvent,BlueprintCallable)
+	void OnResume();
+
+	
+
 protected:
 	
 	void FieldInteractionTick(float DeltaTime);
 	
 	void DirectionalMovementTick(float DeltaTime);
 
+	void SuspendTick(float DeltaTime);
+
 	
 	void Move(const FInputActionValue& Value);
 	// void Jump(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
+	void Fire(const FInputActionValue& Value);
 };

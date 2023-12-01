@@ -17,7 +17,7 @@ struct DeferredReplacementParams
  * 
  */
 UCLASS()
-class CUBEIZATION_API UTerrainRepresentationSubsystem : public UWorldSubsystem
+class CUBEIZATION_API UTerrainRepresentationSubsystem : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
 
@@ -34,6 +34,8 @@ public:
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override { return true; }
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override { return GetStatID(); }
 
 
 	void SetReplacingActorClass(TSubclassOf<ATerrainCubeActor> Class) { ReplacingActorClass = Class; }

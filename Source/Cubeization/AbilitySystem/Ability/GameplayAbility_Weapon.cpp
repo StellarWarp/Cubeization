@@ -1,5 +1,7 @@
 ﻿#include "GameplayAbility_Weapon.h"
 
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Weapons/AtomProjectile.h"
 #include "Weapons/WeaponRespond.h"
@@ -9,10 +11,14 @@ void UGameplayAbility_Weapon::ActivateAbility(const FGameplayAbilitySpecHandle H
                                               const FGameplayAbilityActivationInfo ActivationInfo,
                                               const FGameplayEventData* TriggerEventData)
 {
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	//todo hack method remove this
+	float Time = GetWorld()->GetTimeSeconds();
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo) || Time - LastFireTime < FireInterval)
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return;
 	}
+	LastFireTime = Time;
 
 	//direct raycast and spawn effect and damage
 
@@ -31,16 +37,16 @@ void UGameplayAbility_Weapon::ActivateAbility(const FGameplayAbilitySpecHandle H
 	//get the hit actor
 	AActor* HitActor = HitResult.GetActor();
 
-	//effect
+	//niagara effect
+	if(HitNiagaraEffect && TrailNiagaraEffect)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, HitNiagaraEffect, HitResult.Location);
+		auto Trail = UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, TrailNiagaraEffect,
+																	Actor->GetActorLocation(),
+																	Actor->GetActorRotation());
+		Trail->SetFloatParameter(L"Length", HitResult.Distance);
+	}
 
-	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red,
-	//                                  FString::Printf(
-	// 	                                 TEXT("Hit Actor: %s"), HitActor ? *HitActor->GetName() : TEXT("None")));
-	//
-	//
-	// DrawDebugLine(World,
-	//               HitResult.TraceStart,
-	//               HitResult.Location, FColor::Red, false, 5.f, 0, 5.f);
 
 	//logic process
 	IWeaponRespond* WeaponRespond = Cast<IWeaponRespond>(HitActor);
@@ -58,7 +64,7 @@ void UGameplayAbility_Weapon::ActivateAbility(const FGameplayAbilitySpecHandle H
 	});
 
 
-	// World->SpawnActor<AActor>(DestructionFieldClass, HitResult.Location, FRotator::ZeroRotator);
+	World->SpawnActor<AActor>(DestructionFieldClass, HitResult.Location, FRotator::ZeroRotator);
 
 	// //generate projectile
 	// FTransform SpawnTransform;

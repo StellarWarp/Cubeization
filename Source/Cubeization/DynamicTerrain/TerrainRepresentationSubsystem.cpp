@@ -9,14 +9,21 @@
 
 void UTerrainRepresentationSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
-	Super::Initialize(Collection);
-
 	Collection.InitializeDependency(UTerrainDataSubsystem::StaticClass());
+	
+	Super::Initialize(Collection);
 }
 
 void UTerrainRepresentationSubsystem::Deinitialize()
 {
 	Super::Deinitialize();
+}
+
+void UTerrainRepresentationSubsystem::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	//actor sync
+	UpdateReplacingActor();
 }
 
 void UTerrainRepresentationSubsystem::NotifyDestruction(FWeaponHitInfo Info)

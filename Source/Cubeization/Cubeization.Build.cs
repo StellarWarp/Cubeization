@@ -52,7 +52,7 @@ public class Cubeization : ModuleRules
 			"ChaosSolverEngine",
 			"GeometryCollectionEngine",
 
-			"PhysicsCore",
+			"PhysicsCore", "Niagara",
 		});
 	}
 }

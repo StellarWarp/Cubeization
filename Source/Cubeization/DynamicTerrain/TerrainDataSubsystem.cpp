@@ -19,10 +19,12 @@ void UTerrainDataSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	
 	BaseHeightField.Init(ComputeSize.X, ComputeSize.Y);
 	LastHeightField.Init(ComputeSize.X, ComputeSize.Y);
+	ActivationShiftField.Init(ComputeSize.X, ComputeSize.Y);
 	HeightField.Init(ComputeSize.X, ComputeSize.Y);
 	VelocityField.Init(ComputeSize.X, ComputeSize.Y);
 	AccelerationField.Init(ComputeSize.X, ComputeSize.Y);
 	InstanceIndexId.Init(ComputeSize.X, ComputeSize.Y);
+
 	
 	CubeIndexAllocator = {this};
 
@@ -34,6 +36,83 @@ void UTerrainDataSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UTerrainDataSubsystem::Deinitialize()
 {
 	Super::Deinitialize();
+}
+
+void UTerrainDataSubsystem::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if(bExternalAnimationControl) return;
+	
+	//near by grid transfer
+	static constexpr float TransferKernel[3][3] = {
+		{0.2f, 0.4f, 0.2f},
+		{0.4f, -2.4, 0.4f},
+		{0.2f, 0.4f, 0.2f}
+	};
+	{
+		FIntVector2 Begin = Offset;
+		FIntVector2 End = Offset + DynamicFieldSize;
+
+		auto VelocityFieldRead = VelocityField;
+
+		for (auto y = Begin.Y; y < End.Y; y++)
+		{
+			for (auto x = Begin.X; x < End.X; x++)
+			{
+				float Force = 0;
+				for (int32 i = -1; i <= 1; ++i)
+				{
+					for (int32 j = -1; j <= 1; ++j)
+					{
+						float ChangingHeight =
+							HeightField[FIntVector2(x + i, y + j)] - LastHeightField[FIntVector2(x + i, y + j)];
+						Force += FieldParameter.Transfer * ChangingHeight * TransferKernel[i + 1][j + 1];
+					}
+				}
+				VelocityField[FIntVector2(x, y)] += Force * DeltaTime;
+			}
+		}
+
+		LastHeightField = HeightField;
+	}
+
+
+	//force apply
+	{
+		auto& Queue = DeferredApplyForceQueue;
+		while (!Queue.IsEmpty())
+		{
+			const auto Info = Queue.Peek();
+			ForRangeVelocity(Info->Center, Info->Radius, [=](const FVector& Distance, float& Val)
+			{
+				Val += UTerrainDataSubsystem::GaussianLUT.LUT128[Distance / Info->Radius]
+					* Info->Force * DeltaTime;
+			});
+			Queue.Pop();
+		}
+	}
+
+
+	//field update
+	{
+		auto& RawBaseHeightField = BaseHeightField.GetData();
+		auto& RawHeightField = HeightField.GetData();
+		auto& RawActivationField = ActivationShiftField.GetData();
+		auto& RawVelocityField = VelocityField.GetData();
+
+
+		for (int i = 0; i < RawHeightField.Num(); ++i)
+		{
+			float TargetHeight = RawBaseHeightField[i] + RawActivationField[i];
+			float ElasticForce = -FieldParameter.Elasticity * (RawHeightField[i] - TargetHeight);
+			float DampingForce = -FieldParameter.Damping * RawVelocityField[i];
+			RawVelocityField[i] += (ElasticForce + DampingForce) * DeltaTime;
+			RawHeightField[i] += RawVelocityField[i] * DeltaTime;
+		}
+	}
+
+	FieldParameterLerpTick(DeltaTime);
 }
 
 void UTerrainDataSubsystem::GenerateMap()
@@ -101,15 +180,28 @@ void UTerrainDataSubsystem::GenerateMap()
 		}
 	}
 
-	//copy to base
+	// //copy to base
+	// for (int32 j = 0; j < DynamicFieldSize.Y; ++j)
+	// {
+	// 	for (int32 i = 0; i < DynamicFieldSize.X; ++i)
+	// 	{
+	// 		auto LogicalIndex = LocalIndexToLogicalIndex(FIntVector2(i, j));
+	// 		BaseHeightField[LogicalIndex] = MapHeightField[LogicalIndex];
+	// 		LastHeightField[LogicalIndex] = MapHeightField[LogicalIndex];
+	// 		HeightField[LogicalIndex] = MapHeightField[LogicalIndex];
+	// 	}
+	// }
+}
+
+
+void UTerrainDataSubsystem::MapDataToField()
+{
 	for (int32 j = 0; j < DynamicFieldSize.Y; ++j)
 	{
 		for (int32 i = 0; i < DynamicFieldSize.X; ++i)
 		{
 			auto LogicalIndex = LocalIndexToLogicalIndex(FIntVector2(i, j));
 			BaseHeightField[LogicalIndex] = MapHeightField[LogicalIndex];
-			LastHeightField[LogicalIndex] = MapHeightField[LogicalIndex];
-			HeightField[LogicalIndex] = MapHeightField[LogicalIndex];
 		}
 	}
 }
@@ -171,4 +263,19 @@ void UTerrainDataSubsystem::UpdateCenter(FVector Center)
 		const auto OffsetIncrement = Pos - Offset;
 		ShiftField(OffsetIncrement);
 	}
+}
+
+void UTerrainDataSubsystem::SetFieldParameter(const FFieldParameter& Parameter, float Speed)
+{
+	bFieldParameterLerp = true;
+	NewFieldParameter = Parameter;
+	FieldParameterLerpSpeed = Speed;
+}
+
+void UTerrainDataSubsystem::FieldParameterLerpTick(float DeltaTime)
+{
+	if(!bFieldParameterLerp) return;
+	if(FieldParameter.Lerp(NewFieldParameter, DeltaTime * FieldParameterLerpSpeed))
+		bFieldParameterLerp = false;
+
 }

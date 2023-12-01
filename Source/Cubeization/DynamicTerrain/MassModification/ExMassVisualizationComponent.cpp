@@ -143,8 +143,7 @@ void UExMassVisualizationComponent::TickComponent(float DeltaTime, ELevelTick Ti
 	{
 		BatchUpdateCounter = 0;
 	}
-	BatchUpdateBeginIndex = BatchUpdateCounter * InstanceBodiesSyncBatchSize;
-	BatchUpdateEndIndex = FMath::Min(BatchUpdateBeginIndex + InstanceBodiesSyncBatchSize, TotalInstanceCount);
+
 
 	for (FMassInstancedStaticMeshInfo& InfoSuper : InstancedStaticMeshInfos)
 	{
@@ -192,6 +191,9 @@ void UExMassVisualizationComponent::TickComponent(float DeltaTime, ELevelTick Ti
 			
 			auto& InstanceTransforms = ISMC->PerInstanceSMData;
 			auto& InstanceBodies = ISMC->InstanceBodies;
+
+			int32 BatchUpdateBeginIndex = BatchUpdateCounter * InstanceBodiesSyncBatchSize;
+			int32 BatchUpdateEndIndex = FMath::Min(BatchUpdateBeginIndex + InstanceBodiesSyncBatchSize, TotalInstanceCount);
 
 			int32 BeginIndex = BatchUpdateBeginIndex;
 			int32 EndIndex = BatchUpdateEndIndex;
