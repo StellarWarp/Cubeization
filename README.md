@@ -1,6 +1,6 @@
 # Cubeization
 
-Developed with Unreal Engine 5
+Developed with Unreal Engine 5.2.1
 
 Demo video and package see releases https://github.com/StellarWarp/Cubeization/releases
 
