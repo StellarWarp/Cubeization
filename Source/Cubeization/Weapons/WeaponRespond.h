@@ -20,7 +20,7 @@ struct FWeaponHitInfo
 	FVector HitNormal;
 
 	UPROPERTY()
-	FVector NormalImpulse;
+	FVector Impulse;
 
 	UPROPERTY()
 	FHitResult HitResult;

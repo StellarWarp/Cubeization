@@ -29,6 +29,9 @@ class CUBEIZATION_API UTerrainRepresentationSubsystem : public UTickableWorldSub
 
 	TQueue<DeferredReplacementParams> DeferredReplacementQueue;
 
+	//initialize in Initialize
+	class UTerrainDataSubsystem* TerrainDataSubsystem;
+
 public:
 
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override { return true; }

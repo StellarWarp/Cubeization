@@ -11,24 +11,25 @@ void UGameplayAbility_Weapon::ActivateAbility(const FGameplayAbilitySpecHandle H
                                               const FGameplayAbilityActivationInfo ActivationInfo,
                                               const FGameplayEventData* TriggerEventData)
 {
-	//todo hack method remove this
-	float Time = GetWorld()->GetTimeSeconds();
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo) || Time - LastFireTime < FireInterval)
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
-	LastFireTime = Time;
+	//log LastFireTime and time
 
 	//direct raycast and spawn effect and damage
 
 	auto Actor = ActorInfo->AvatarActor.Get();
 	auto World = Actor->GetWorld();
 
+	FVector StartLocation = Actor->GetActorLocation();
+	FVector Direction = Actor->GetActorForwardVector();
+
 	FHitResult HitResult;
 	World->LineTraceSingleByChannel(HitResult,
-	                                Actor->GetActorLocation(),
-	                                Actor->GetActorLocation() + Actor->GetActorForwardVector() * 10000,
+	                                StartLocation,
+	                                StartLocation + Direction * 10000,
 	                                ECollisionChannel::ECC_Visibility,
 	                                FCollisionQueryParams::DefaultQueryParam,
 	                                FCollisionResponseParams::DefaultResponseParam);
@@ -42,7 +43,7 @@ void UGameplayAbility_Weapon::ActivateAbility(const FGameplayAbilitySpecHandle H
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, HitNiagaraEffect, HitResult.Location);
 		auto Trail = UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, TrailNiagaraEffect,
-																	Actor->GetActorLocation(),
+																	StartLocation,
 																	Actor->GetActorRotation());
 		Trail->SetFloatParameter(L"Length", HitResult.Distance);
 	}
@@ -56,10 +57,11 @@ void UGameplayAbility_Weapon::ActivateAbility(const FGameplayAbilitySpecHandle H
 		return;
 	}
 
+	//call cpp only
 	WeaponRespond->NotifyWeaponHit_Implementation({
 		HitResult.Location,
 		HitResult.ImpactNormal,
-		HitResult.ImpactNormal, //impose,
+		Direction * ImpulseMultiplier,
 		HitResult,
 	});
 
@@ -94,5 +96,14 @@ void UGameplayAbility_Weapon::ActivateAbility(const FGameplayAbilitySpecHandle H
 	// UGameplayStatics::SpawnEmitterAtLocation(ActorInfo->AvatarActor->GetWorld(), Effect, HitResult.ImpactPoint);
 
 
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	// Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	//delay end ability
+	FTimerHandle TimerHandle;
+	World->GetTimerManager().SetTimer(TimerHandle, [this]()
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}, FireInterval, false);
+	
 }

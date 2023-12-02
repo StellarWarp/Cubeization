@@ -12,6 +12,9 @@ void UTerrainRepresentationSubsystem::Initialize(FSubsystemCollectionBase& Colle
 	Collection.InitializeDependency(UTerrainDataSubsystem::StaticClass());
 	
 	Super::Initialize(Collection);
+
+	TerrainDataSubsystem = GetWorld()->GetSubsystem<UTerrainDataSubsystem>();
+
 }
 
 void UTerrainRepresentationSubsystem::Deinitialize()
@@ -28,7 +31,6 @@ void UTerrainRepresentationSubsystem::Tick(float DeltaTime)
 
 void UTerrainRepresentationSubsystem::NotifyDestruction(FWeaponHitInfo Info)
 {
-	auto TerrainDataSubsystem = GetWorld()->GetSubsystem<UTerrainDataSubsystem>();
 
 	FVector InnerPosition = Info.HitLocation - Info.HitNormal * 0.5f * TerrainDataSubsystem->CubeLength;
 
@@ -38,12 +40,16 @@ void UTerrainRepresentationSubsystem::NotifyDestruction(FWeaponHitInfo Info)
 	FIntVector2 CubeIndex = TerrainDataSubsystem->WorldPositionToLogicalIndex(InnerPosition);
 
 	DeferredReplacementQueue.Enqueue({CubeIndex, Info.HitLocation});
+
+	TerrainDataSubsystem->ApplyForce(
+		Info.HitLocation,
+		Info.Impulse.Z,
+		3);
 }
 
 
 void UTerrainRepresentationSubsystem::DeferredInstanceUpdate(UInstancedStaticMeshComponent* ISMC)
 {
-	auto TerrainDataSubsystem = GetWorld()->GetSubsystem<UTerrainDataSubsystem>();
 
 	auto& InstanceTransforms = ISMC->PerInstanceSMData;
 	auto& InstanceBodies = ISMC->InstanceBodies;
